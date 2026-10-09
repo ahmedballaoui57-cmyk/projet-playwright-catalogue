@@ -1,43 +1,11 @@
-import os
-import threading
-from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
-
 import pytest
 
-import extraction
 from extraction import ExtracteurCatalogue
 
-SITE = Path(__file__).parent / "site"
-
-# Par défaut le Chrome du poste ; NAVIGATEUR_TESTS=chromium utilise celui installé par Playwright.
-NAVIGATEUR = os.environ.get("NAVIGATEUR_TESTS", "chrome")
-
-
-class ServeurSilencieux(SimpleHTTPRequestHandler):
-    def log_message(self, *args):
-        pass
-
 
 @pytest.fixture(scope="module")
-def site():
-    """Sert tests/site en local et y redirige l'extracteur : aucun accès au réseau."""
-    serveur = ThreadingHTTPServer(("127.0.0.1", 0), partial(ServeurSilencieux, directory=str(SITE)))
-    threading.Thread(target=serveur.serve_forever, daemon=True).start()
-    url = f"http://127.0.0.1:{serveur.server_port}/"
-
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(extraction, "URL_ACCUEIL", url)
-        yield url
-
-    serveur.shutdown()
-    serveur.server_close()
-
-
-@pytest.fixture(scope="module")
-def livres(site):
-    return ExtracteurCatalogue(NAVIGATEUR).extraire()
+def livres(site, navigateur):
+    return ExtracteurCatalogue(navigateur).extraire()
 
 
 def test_extraire_parcourt_toutes_les_categories(livres):
@@ -61,7 +29,7 @@ def test_extraire_lit_les_champs_d_un_livre(livres, site):
     }
 
 
-def test_max_categories_limite_le_parcours(site):
-    livres = ExtracteurCatalogue(NAVIGATEUR, max_categories=1).extraire()
+def test_max_categories_limite_le_parcours(site, navigateur):
+    livres = ExtracteurCatalogue(navigateur, max_categories=1).extraire()
     assert {livre["categorie"] for livre in livres} == {"Travel"}
     assert len(livres) == 3

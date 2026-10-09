@@ -1,0 +1,7 @@
+.git
+.github
+.venv
+.env
+.pytest_cache
+**/__pycache__
+sortie

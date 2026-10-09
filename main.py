@@ -1,10 +1,15 @@
-"""Chaîne complète : extraction web (Playwright) -> traitement (Pandas) -> rapport Excel (OpenPyXL)."""
+"""Chaîne complète : extraction web (Playwright) -> traitement (Pandas) -> PostgreSQL et rapport Excel."""
 
 import argparse
 import sys
 import time
 from pathlib import Path
 
+import pandas as pd
+
+from app.config import reglages
+from app.db import SessionLocale
+from app.service_extraction import AUCUN_LIVRE, ExtractionDejaEnCours, demarrer, executer
 from export_excel import exporter
 from extraction import ExtracteurCatalogue
 from traitement import indicateurs_par_categorie, nettoyer
@@ -12,14 +17,36 @@ from traitement import indicateurs_par_categorie, nettoyer
 
 def lire_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--navigateur", choices=["chrome", "msedge", "chromium"], default="chrome",
+    parser.add_argument("--navigateur", choices=["chrome", "msedge", "chromium"],
+                        default=reglages.navigateur,
                         help="chrome ou msedge déjà présent sur le poste, ou chromium (installé par Playwright)")
     parser.add_argument("--visible", action="store_true",
                         help="affiche la fenêtre du navigateur pendant l'extraction")
     parser.add_argument("--max-categories", type=int, default=None,
                         help="limite le nombre de catégories parcourues (pour un essai rapide)")
     parser.add_argument("--sortie", default="sortie", help="dossier des fichiers générés")
+    parser.add_argument("--sans-base", action="store_true",
+                        help="n'écrit pas dans PostgreSQL : seuls les fichiers sont générés")
     return parser.parse_args()
+
+
+def extraire_vers_base(extracteur: ExtracteurCatalogue) -> pd.DataFrame:
+    with SessionLocale() as session:
+        try:
+            extraction = demarrer(session)
+        except ExtractionDejaEnCours:
+            sys.exit("Une extraction est déjà en cours.")
+    try:
+        return executer(extraction.id, extracteur)
+    except Exception as erreur:
+        sys.exit(f"Extraction échouée : {erreur}")
+
+
+def extraire_sans_base(extracteur: ExtracteurCatalogue) -> pd.DataFrame:
+    livres = extracteur.extraire()
+    if not livres:
+        sys.exit(AUCUN_LIVRE)
+    return nettoyer(livres)
 
 
 def main() -> None:
@@ -29,11 +56,7 @@ def main() -> None:
     debut = time.perf_counter()
 
     extracteur = ExtracteurCatalogue(args.navigateur, args.visible, args.max_categories)
-    livres = extracteur.extraire()
-    if not livres:
-        sys.exit("Aucun livre extrait : la structure du site a peut-être changé.")
-
-    df = nettoyer(livres)
+    df = extraire_sans_base(extracteur) if args.sans_base else extraire_vers_base(extracteur)
     kpi = indicateurs_par_categorie(df)
 
     # utf-8-sig : Excel ouvre le CSV avec les accents corrects.

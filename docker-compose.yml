@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: catalogue
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-catalogue}
+      POSTGRES_DB: catalogue
+    ports:
+      # Accès depuis le poste uniquement (psql, DBeaver, pgAdmin).
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - donnees:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalogue -d catalogue"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://catalogue:${POSTGRES_PASSWORD:-catalogue}@db:5432/catalogue
+      CLE_API: ${CLE_API:-changez-moi}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Les rapports Excel et CSV générés par main.py restent visibles sur le poste.
+      - ./sortie:/app/sortie
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Les deux services suivants ne démarrent qu'avec : docker compose --profile tests run --rm tests
+  db-tests:
+    profiles: [tests]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: catalogue
+      POSTGRES_PASSWORD: catalogue
+      POSTGRES_DB: catalogue_test
+    # Base jetable, en mémoire : les tests ne touchent jamais aux données de « db ».
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalogue -d catalogue_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  tests:
+    profiles: [tests]
+    build:
+      context: .
+      target: tests
+    environment:
+      DATABASE_URL: postgresql+psycopg://catalogue:catalogue@db-tests:5432/catalogue_test
+      NAVIGATEUR_TESTS: chromium
+    depends_on:
+      db-tests:
+        condition: service_healthy
+
+volumes:
+  donnees:

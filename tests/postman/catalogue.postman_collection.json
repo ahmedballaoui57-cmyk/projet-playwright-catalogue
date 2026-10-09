@@ -1,0 +1,1150 @@
+{
+  "info": {
+    "name": "Tests API Catalogue",
+    "description": "Tests de l'API du catalogue. Renseigner la variable de collection cle_api (valeur de CLE_API dans .env), puis lancer toute la collection : le dossier Extractions remplit la base avant les tests de lecture.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{cle_api}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "cle_api",
+      "value": ""
+    },
+    {
+      "key": "extraction_id",
+      "value": ""
+    },
+    {
+      "key": "livre_id",
+      "value": ""
+    },
+    {
+      "key": "total_livres",
+      "value": ""
+    },
+    {
+      "key": "essais",
+      "value": "0"
+    }
+  ],
+  "item": [
+    {
+      "name": "Santé",
+      "item": [
+        {
+          "name": "Santé de l'API",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"L'API joint la base\", () => pm.expect(pm.response.json()).to.eql({ statut: \"ok\" }));",
+                  "pm.test(\"Réponse en moins de 2 s\", () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sante",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sante"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Extractions",
+      "item": [
+        {
+          "name": "Lancer sans clé",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Le message d'erreur est explicite\", () => {",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Clé d'API absente ou invalide.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/extractions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "extractions"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Lancer avec une mauvaise clé",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Le message d'erreur est explicite\", () => {",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Clé d'API absente ou invalide.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "mauvaise-cle"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/extractions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "extractions"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Lancer avec max_categories invalide",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 422 : paramètre refusé\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"L'erreur désigne le paramètre max_categories\", () => {",
+                  "    pm.expect(pm.response.json().detail[0].loc).to.include(\"max_categories\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/extractions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "extractions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"max_categories\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Lancer une extraction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 202 : extraction acceptée\", () => pm.response.to.have.status(202));",
+                  "const extraction = pm.response.json();",
+                  "pm.test(\"L'extraction démarre en cours\", () => {",
+                  "    pm.expect(extraction.statut).to.eql(\"en_cours\");",
+                  "    pm.expect(extraction.fin).to.be.null;",
+                  "    pm.expect(extraction.nb_livres).to.be.null;",
+                  "    pm.expect(extraction.erreur).to.be.null;",
+                  "});",
+                  "pm.test(\"L'extraction a un identifiant et une date de début\", () => {",
+                  "    pm.expect(extraction.id).to.be.a(\"number\");",
+                  "    pm.expect(new Date(extraction.debut).getTime()).to.be.a(\"number\").and.not.NaN;",
+                  "});",
+                  "pm.collectionVariables.set(\"extraction_id\", extraction.id);",
+                  "pm.collectionVariables.set(\"essais\", 0);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/extractions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "extractions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"max_categories\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Lancer pendant qu'une autre tourne",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Le message d'erreur est explicite\", () => {",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Une extraction est déjà en cours.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/extractions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "extractions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"max_categories\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Suivre l'extraction jusqu'à la fin",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Une seconde d'attente entre deux lectures du statut.",
+                  "setTimeout(() => {}, 1000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const extraction = pm.response.json();",
+                  "const essais = Number(pm.collectionVariables.get(\"essais\")) + 1;",
+                  "pm.collectionVariables.set(\"essais\", essais);",
+                  "",
+                  "if (extraction.statut === \"en_cours\" && essais < 120) {",
+                  "    // Dans le Collection Runner, la requête est rejouée jusqu'à la fin de l'extraction.",
+                  "    pm.execution.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "    pm.test(\"L'extraction est terminée\", () => pm.expect(extraction.statut).to.eql(\"terminee\"));",
+                  "    pm.test(\"Des livres ont été enregistrés\", () => pm.expect(extraction.nb_livres).to.be.above(0));",
+                  "    pm.test(\"La date de fin suit la date de début\", () => {",
+                  "        pm.expect(new Date(extraction.fin)).to.be.above(new Date(extraction.debut));",
+                  "    });",
+                  "    pm.test(\"Aucune erreur\", () => pm.expect(extraction.erreur).to.be.null);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/extractions/{{extraction_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "extractions",
+                "{{extraction_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Historique des extractions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const extractions = pm.response.json();",
+                  "pm.test(\"Au plus 20 extractions\", () => pm.expect(extractions).to.be.an(\"array\").with.length.within(1, 20));",
+                  "pm.test(\"La plus récente est en premier\", () => {",
+                  "    pm.expect(extractions[0].id).to.eql(Number(pm.collectionVariables.get(\"extraction_id\")));",
+                  "    const ids = extractions.map(e => e.id);",
+                  "    pm.expect(ids).to.eql([...ids].sort((a, b) => b - a));",
+                  "});",
+                  "pm.test(\"Chaque statut est connu\", () => {",
+                  "    extractions.forEach(e => pm.expect(e.statut).to.be.oneOf([\"en_cours\", \"terminee\", \"echouee\"]));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/extractions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "extractions"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Extraction inconnue",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Le message d'erreur est explicite\", () => {",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Extraction introuvable.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/extractions/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "extractions",
+                "999999"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Livres",
+      "item": [
+        {
+          "name": "Liste des livres",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Réponse en JSON\", () => pm.response.to.have.header(\"Content-Type\", \"application/json\"));",
+                  "const page = pm.response.json();",
+                  "pm.test(\"Pagination par défaut : page 1, 20 livres\", () => {",
+                  "    pm.expect(page.page).to.eql(1);",
+                  "    pm.expect(page.taille).to.eql(20);",
+                  "    pm.expect(page.total).to.be.above(0);",
+                  "    pm.expect(page.elements).to.be.an(\"array\").with.length.within(1, 20);",
+                  "});",
+                  "pm.test(\"Chaque livre a tous ses champs, bien typés\", () => {",
+                  "    page.elements.forEach(livre => {",
+                  "        pm.expect(livre).to.have.all.keys(\"id\", \"titre\", \"categorie\", \"prix_gbp\", \"note\", \"en_stock\", \"url\");",
+                  "        pm.expect(livre.id).to.be.a(\"number\");",
+                  "        pm.expect(livre.titre).to.be.a(\"string\").that.is.not.empty;",
+                  "        pm.expect(livre.prix_gbp).to.be.a(\"number\").above(0);",
+                  "        pm.expect(livre.note).to.be.within(1, 5);",
+                  "        pm.expect(livre.en_stock).to.be.a(\"boolean\");",
+                  "        pm.expect(livre.url).to.match(/^https?:\\/\\//);",
+                  "    });",
+                  "});",
+                  "pm.collectionVariables.set(\"livre_id\", page.elements[0].id);",
+                  "pm.collectionVariables.set(\"total_livres\", page.total);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Pagination",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "pm.test(\"La page et la taille demandées sont renvoyées\", () => {",
+                  "    pm.expect(page.page).to.eql(2);",
+                  "    pm.expect(page.taille).to.eql(5);",
+                  "    pm.expect(page.elements.length).to.be.at.most(5);",
+                  "});",
+                  "pm.test(\"Le total reste celui de la recherche entière\", () => {",
+                  "    pm.expect(page.total).to.eql(Number(pm.collectionVariables.get(\"total_livres\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres?taille=5&page=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ],
+              "query": [
+                {
+                  "key": "taille",
+                  "value": "5"
+                },
+                {
+                  "key": "page",
+                  "value": "2"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filtre par catégorie",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "const livres = page.elements;",
+                  "pm.test(\"Le filtre renvoie des livres\", () => {",
+                  "    pm.expect(livres).to.be.an(\"array\").that.is.not.empty;",
+                  "    pm.expect(page.total).to.be.at.least(livres.length);",
+                  "});",
+                  "",
+                  "pm.test(\"Tous les livres sont de la catégorie Travel (casse ignorée)\", () => {",
+                  "    livres.forEach(l => pm.expect(l.categorie).to.eql(\"Travel\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres?categorie=travel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ],
+              "query": [
+                {
+                  "key": "categorie",
+                  "value": "travel"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filtre par prix, tri croissant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "const livres = page.elements;",
+                  "pm.test(\"Le filtre renvoie des livres\", () => {",
+                  "    pm.expect(livres).to.be.an(\"array\").that.is.not.empty;",
+                  "    pm.expect(page.total).to.be.at.least(livres.length);",
+                  "});",
+                  "",
+                  "pm.test(\"Tous les prix sont entre 20 et 50\", () => {",
+                  "    livres.forEach(l => pm.expect(l.prix_gbp).to.be.within(20, 50));",
+                  "});",
+                  "pm.test(\"Prix croissants\", () => {",
+                  "    const prix = livres.map(l => l.prix_gbp);",
+                  "    pm.expect(prix).to.eql([...prix].sort((a, b) => a - b));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres?prix_min=20&prix_max=50&tri=prix_gbp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ],
+              "query": [
+                {
+                  "key": "prix_min",
+                  "value": "20"
+                },
+                {
+                  "key": "prix_max",
+                  "value": "50"
+                },
+                {
+                  "key": "tri",
+                  "value": "prix_gbp"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filtre par note, tri décroissant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "const livres = page.elements;",
+                  "pm.test(\"Le filtre renvoie des livres\", () => {",
+                  "    pm.expect(livres).to.be.an(\"array\").that.is.not.empty;",
+                  "    pm.expect(page.total).to.be.at.least(livres.length);",
+                  "});",
+                  "",
+                  "pm.test(\"Toutes les notes valent au moins 3\", () => {",
+                  "    livres.forEach(l => pm.expect(l.note).to.be.at.least(3));",
+                  "});",
+                  "pm.test(\"Notes décroissantes\", () => {",
+                  "    const notes = livres.map(l => l.note);",
+                  "    pm.expect(notes).to.eql([...notes].sort((a, b) => b - a));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres?note_min=3&tri=-note",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ],
+              "query": [
+                {
+                  "key": "note_min",
+                  "value": "3"
+                },
+                {
+                  "key": "tri",
+                  "value": "-note"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filtre en stock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "const livres = page.elements;",
+                  "pm.test(\"Le filtre renvoie des livres\", () => {",
+                  "    pm.expect(livres).to.be.an(\"array\").that.is.not.empty;",
+                  "    pm.expect(page.total).to.be.at.least(livres.length);",
+                  "});",
+                  "",
+                  "pm.test(\"Tous les livres sont en stock\", () => {",
+                  "    livres.forEach(l => pm.expect(l.en_stock).to.be.true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres?en_stock=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ],
+              "query": [
+                {
+                  "key": "en_stock",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Recherche dans le titre",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "const livres = page.elements;",
+                  "pm.test(\"Le filtre renvoie des livres\", () => {",
+                  "    pm.expect(livres).to.be.an(\"array\").that.is.not.empty;",
+                  "    pm.expect(page.total).to.be.at.least(livres.length);",
+                  "});",
+                  "",
+                  "pm.test(\"Tous les titres contiennent « the » (casse ignorée)\", () => {",
+                  "    livres.forEach(l => pm.expect(l.titre.toLowerCase()).to.include(\"the\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres?q=THE",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "THE"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Recherche sans résultat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Liste vide et total à zéro\", () => {",
+                  "    pm.expect(pm.response.json().total).to.eql(0);",
+                  "    pm.expect(pm.response.json().elements).to.eql([]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres?q=zzz-aucun-livre-zzz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "zzz-aucun-livre-zzz"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Un livre par identifiant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"C'est le livre demandé\", () => {",
+                  "    pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"livre_id\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres/{{livre_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres",
+                "{{livre_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Livre inconnu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Le message d'erreur est explicite\", () => {",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Livre introuvable.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres",
+                "999999"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Identifiant non numérique",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 422 : paramètre refusé\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"L'erreur désigne le paramètre livre_id\", () => {",
+                  "    pm.expect(pm.response.json().detail[0].loc).to.include(\"livre_id\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres",
+                "abc"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Taille de page trop grande",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 422 : paramètre refusé\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"L'erreur désigne le paramètre taille\", () => {",
+                  "    pm.expect(pm.response.json().detail[0].loc).to.include(\"taille\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres?taille=500",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ],
+              "query": [
+                {
+                  "key": "taille",
+                  "value": "500"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Page zéro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 422 : paramètre refusé\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"L'erreur désigne le paramètre page\", () => {",
+                  "    pm.expect(pm.response.json().detail[0].loc).to.include(\"page\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres?page=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Note hors bornes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 422 : paramètre refusé\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"L'erreur désigne le paramètre note_min\", () => {",
+                  "    pm.expect(pm.response.json().detail[0].loc).to.include(\"note_min\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres?note_min=6",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ],
+              "query": [
+                {
+                  "key": "note_min",
+                  "value": "6"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Prix négatif",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 422 : paramètre refusé\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"L'erreur désigne le paramètre prix_min\", () => {",
+                  "    pm.expect(pm.response.json().detail[0].loc).to.include(\"prix_min\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres?prix_min=-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ],
+              "query": [
+                {
+                  "key": "prix_min",
+                  "value": "-1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tri inconnu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 422 : paramètre refusé\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"L'erreur désigne le paramètre tri\", () => {",
+                  "    pm.expect(pm.response.json().detail[0].loc).to.include(\"tri\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/livres?tri=url",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "livres"
+              ],
+              "query": [
+                {
+                  "key": "tri",
+                  "value": "url"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catégories",
+      "item": [
+        {
+          "name": "Liste des catégories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const categories = pm.response.json();",
+                  "pm.test(\"Chaque catégorie a un nom et un nombre de livres\", () => {",
+                  "    pm.expect(categories).to.be.an(\"array\").that.is.not.empty;",
+                  "    categories.forEach(c => {",
+                  "        pm.expect(c).to.have.all.keys(\"id\", \"nom\", \"nb_livres\");",
+                  "        pm.expect(c.nom).to.be.a(\"string\").that.is.not.empty;",
+                  "        pm.expect(c.nb_livres).to.be.at.least(0);",
+                  "    });",
+                  "});",
+                  "pm.test(\"Les noms sont uniques\", () => {",
+                  "    const noms = categories.map(c => c.nom);",
+                  "    pm.expect(new Set(noms).size).to.eql(noms.length);",
+                  "});",
+                  "pm.test(\"La somme des livres par catégorie égale le total des livres\", () => {",
+                  "    const somme = categories.reduce((s, c) => s + c.nb_livres, 0);",
+                  "    pm.expect(somme).to.eql(Number(pm.collectionVariables.get(\"total_livres\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Indicateurs par catégorie",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const indicateurs = pm.response.json();",
+                  "pm.test(\"Chaque ligne a tous ses indicateurs\", () => {",
+                  "    pm.expect(indicateurs).to.be.an(\"array\").that.is.not.empty;",
+                  "    indicateurs.forEach(i => pm.expect(i).to.have.all.keys(",
+                  "        \"categorie\", \"nb_livres\", \"prix_moyen\", \"prix_min\", \"prix_max\", \"note_moyenne\"));",
+                  "});",
+                  "pm.test(\"Le prix moyen est entre le minimum et le maximum\", () => {",
+                  "    indicateurs.forEach(i => pm.expect(i.prix_moyen).to.be.within(i.prix_min, i.prix_max));",
+                  "});",
+                  "pm.test(\"La note moyenne est entre 1 et 5\", () => {",
+                  "    indicateurs.forEach(i => pm.expect(i.note_moyenne).to.be.within(1, 5));",
+                  "});",
+                  "pm.test(\"Les catégories les plus fournies sont en premier\", () => {",
+                  "    const nombres = indicateurs.map(i => i.nb_livres);",
+                  "    pm.expect(nombres).to.eql([...nombres].sort((a, b) => b - a));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/indicateurs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "indicateurs"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

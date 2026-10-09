@@ -2,3 +2,7 @@
 __pycache__/
 .pytest_cache/
 sortie/
+.env
+# Espace de travail Postman local (la collection de tests est dans tests/postman/)
+/postman/
+/.postman/
